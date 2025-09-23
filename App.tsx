@@ -6,7 +6,6 @@ import {
   WorkItem,
   Doubt,
 } from "./types";
-import { initialStudents, initialSubjects } from "./constants";
 import StudentCard from "./components/StudentCard";
 import StudentDrawer from "./components/StudentDrawer";
 import StudentForm from "./components/StudentForm";
@@ -32,8 +31,26 @@ import {
 type Page = "students" | "subjects" | "syllabus" | "work-pool" | "doubts";
 
 const App: React.FC = () => {
-  const [students, setStudents] = useState<Student[]>([]); // start empty
+  // State management
+  const [students, setStudents] = useState<Student[]>([]);
+  const [allStudentSubjects, setAllStudentSubjects] = useState<{
+    [key: string]: { studentId: string; subjects: SubjectData[] };
+  }>({});
+  const [chapterProgress, setChapterProgress] = useState<ChapterProgress[]>([]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(
+    null
+  );
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [showArchived, setShowArchived] = useState<boolean>(false);
+  const [filters, setFilters] = useState({ board: "", grade: "", batch: "" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState<Page>("students");
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
+  // Fetch data from Firestore on component mount
   useEffect(() => {
     const fetchStudents = async () => {
       try {
@@ -53,10 +70,6 @@ const App: React.FC = () => {
 
     fetchStudents();
   }, []);
-
-  const [allStudentSubjects, setAllStudentSubjects] = useState<{
-    [key: string]: { studentId: string; subjects: SubjectData[] };
-  }>(() => {});
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -82,8 +95,6 @@ const App: React.FC = () => {
     fetchSubjects();
   }, []);
 
-  const [chapterProgress, setChapterProgress] = useState<ChapterProgress[]>([]); // start empty
-
   useEffect(() => {
     const fetchChapterProgress = async () => {
       try {
@@ -107,82 +118,74 @@ const App: React.FC = () => {
     fetchChapterProgress();
   }, []);
 
-  const [workItems, setWorkItems] = useState<WorkItem[]>(() => {
-    try {
-      const localData = localStorage.getItem("sez.work");
-      return localData ? JSON.parse(localData) : [];
-    } catch (error) {
-      console.error("Error parsing work items from localStorage:", error);
-      return [];
-    }
-  });
+  useEffect(() => {
+    const fetchWorkItems = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "workItems"));
+        const workItemsData: WorkItem[] = querySnapshot.docs.map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            } as WorkItem)
+        );
+        setWorkItems(workItemsData);
+      } catch (error) {
+        console.error("Failed to fetch work items from Firestore:", error);
+      }
+    };
 
-  const [doubts, setDoubts] = useState<Doubt[]>(() => {
-    try {
-      const localData = localStorage.getItem("sez.doubts");
-      return localData ? JSON.parse(localData) : [];
-    } catch (error) {
-      console.error("Error parsing doubts from localStorage:", error);
-      return [];
-    }
-  });
-
-  const [darkMode, setDarkMode] = useState<boolean>(false);
-  const [editingStudent, setEditingStudent] = useState<Partial<Student> | null>(
-    null
-  );
-  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
-  const [showArchived, setShowArchived] = useState<boolean>(false);
-  const [filters, setFilters] = useState({ board: "", grade: "", batch: "" });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState<Page>("students");
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-
-  //   useEffect(() => {
-  //     localStorage.setItem("sez.students", JSON.stringify(students));
-  //   }, [students]);
-
-  //   useEffect(() => {
-  //     localStorage.setItem("sez.subjects", JSON.stringify(allStudentSubjects));
-  //   }, [allStudentSubjects]);
-
-//   useEffect(() => {
-//     localStorage.setItem("sez.chapters", JSON.stringify(chapterProgress));
-//   }, [chapterProgress]);
+    fetchWorkItems();
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem("sez.work", JSON.stringify(workItems));
-  }, [workItems]);
+    const fetchDoubts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "doubts"));
+        const doubtsData: Doubt[] = querySnapshot.docs.map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            } as Doubt)
+        );
+        setDoubts(doubtsData);
+      } catch (error) {
+        console.error("Failed to fetch doubts from Firestore:", error);
+      }
+    };
 
-  useEffect(() => {
-    localStorage.setItem("sez.doubts", JSON.stringify(doubts));
-  }, [doubts]);
-  // ➕ In App.tsx, ADD this new useEffect block:
-  useEffect(() => {
-    localStorage.setItem("sez.doubts", JSON.stringify(doubts));
-  }, [doubts]);
+    fetchDoubts();
+  }, []);
 
-  // ✅ THIS IS THE NEW LOGIC TO ADD
+  // Update doubt statuses based on work items
   useEffect(() => {
-    // Only run if there are doubts to check
     if (doubts.length === 0) return;
 
     let hasChanges = false;
-    // Create a new array by checking each doubt against the work items
     const newDoubts = doubts.map((doubt) => {
       const updatedDoubt = updateDoubtStatusFromWorkItems(doubt, workItems);
-      // If the status has changed, we'll need to save the state
       if (updatedDoubt.status !== doubt.status) {
         hasChanges = true;
       }
       return updatedDoubt;
     });
 
-    // If any doubt was updated, set the new state
     if (hasChanges) {
       setDoubts(newDoubts);
+      // Save updated doubts to Firestore
+      newDoubts.forEach(async (doubt) => {
+        try {
+          const doubtRef = doc(db, "doubts", doubt.id);
+          await setDoc(doubtRef, doubt);
+        } catch (error) {
+          console.error("Failed to update doubt in Firestore:", error);
+        }
+      });
     }
-  }, [workItems]); // This effect runs ONLY when workItems change
+  }, [workItems]);
+
+  // Dark mode effect
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
@@ -191,6 +194,7 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Event handlers
   const handleSaveStudent = useCallback(async (studentData: Student) => {
     setStudents((prev) => {
       const existing = prev.find((s) => s.id === studentData.id);
@@ -202,7 +206,6 @@ const App: React.FC = () => {
     setViewingStudent(studentData);
 
     try {
-      // Use student id as doc id
       const studentRef = doc(db, "students", studentData.id);
       await setDoc(studentRef, studentData);
       console.log("Student saved to Firestore:", studentData.id);
@@ -219,7 +222,6 @@ const App: React.FC = () => {
       }));
 
       try {
-        // Save subjects for this student
         const docRef = doc(db, "studentSubjects", studentId);
         await setDoc(docRef, { studentId, subjects });
         console.log("Subjects saved to Firestore for student:", studentId);
@@ -231,7 +233,7 @@ const App: React.FC = () => {
   );
 
   const handleSaveChapterProgress = useCallback(
-    (progress: ChapterProgress) => {
+    async (progress: ChapterProgress) => {
       const oldProgress = chapterProgress.find((p) => p.id === progress.id);
       const oldEntries = oldProgress?.entries ?? [];
       const oldEntryIds = new Set(oldEntries.map((e) => e.id));
@@ -239,68 +241,92 @@ const App: React.FC = () => {
       const newEntries = progress.entries;
       const newEntryIds = new Set(newEntries.map((e) => e.id));
 
-      // --- LOGIC FOR ADDING A WORK ITEM ---
-      const addedEntries = newEntries.filter((e) => !oldEntryIds.has(e.id));
-      const newStartEntry = addedEntries.find((e) => e.type === "start");
+      //   // Logic for adding a work item
+      //   const addedEntries = newEntries.filter((e) => !oldEntryIds.has(e.id));
+      //   const newStartEntry = addedEntries.find((e) => e.type === "start");
 
-      if (newStartEntry) {
-        const workAlreadyExists = workItems.some(
-          (item) =>
-            item.source === "syllabus" &&
-            item.studentId === progress.studentId &&
-            item.subject === progress.subject &&
-            item.chapterNo === progress.chapterNo &&
-            item.title ===
-              `Start reading & note making for ${progress.chapterName}`
-        );
+      //   if (newStartEntry) {
+      //     const workAlreadyExists = workItems.some(
+      //       (item) =>
+      //         item.source === "syllabus" &&
+      //         item.studentId === progress.studentId &&
+      //         item.subject === progress.subject &&
+      //         item.chapterNo === progress.chapterNo &&
+      //         item.title ===
+      //           `Start reading & note making for ${progress.chapterName}`
+      //     );
 
-        if (!workAlreadyExists) {
-          const dueDate = new Date(newStartEntry.date);
-          dueDate.setDate(dueDate.getDate() + 7);
+      //     if (!workAlreadyExists) {
+      //       const dueDate = new Date(newStartEntry.date);
+      //       dueDate.setDate(dueDate.getDate() + 7);
 
-          const newWorkItem: WorkItem = {
-            id: `w_${Date.now()}`,
-            studentId: progress.studentId,
-            title: `Start reading & note making for ${progress.chapterName}`,
-            subject: progress.subject,
-            chapterNo: progress.chapterNo,
-            chapterName: progress.chapterName,
-            topic: "",
-            description:
-              "Begin reading and making notes as the chapter has started in school.",
-            dueDate: dueDate.toISOString().split("T")[0],
-            status: "Assign",
-            priority: "Low",
-            links: [],
-            files: [],
-            mentorNote: "",
-            dateCreated: new Date().toISOString().split("T")[0],
-            source: "syllabus",
-          };
-          setWorkItems((prev) => [...prev, newWorkItem]);
-        }
-      }
+      //       const newWorkItem: WorkItem = {
+      //         id: `w_${Date.now()}`,
+      //         studentId: progress.studentId,
+      //         title: `Start reading & note making for ${progress.chapterName}`,
+      //         subject: progress.subject,
+      //         chapterNo: progress.chapterNo,
+      //         chapterName: progress.chapterName,
+      //         topic: null,
+      //         description:
+      //           "Begin reading and making notes as the chapter has started in school.",
+      //         dueDate: dueDate.toISOString().split("T")[0],
+      //         status: "Assign",
+      //         priority: "Low",
+      //         links: null,
+      //         files: null,
+      //         mentorNote: null,
+      //         dateCreated: new Date().toISOString().split("T")[0],
+      //         source: "syllabus",
+      //         linkedDoubtId: null,
+      //       };
 
-      // --- LOGIC FOR REMOVING A WORK ITEM ---
-      const removedEntries = oldEntries.filter((e) => !newEntryIds.has(e.id));
-      const removedStartEntry = removedEntries.find((e) => e.type === "start");
+      //       setWorkItems((prev) => [...prev, newWorkItem]);
 
-      if (removedStartEntry) {
-        setWorkItems((prev) =>
-          prev.filter(
-            (item) =>
-              !(
-                item.source === "syllabus" &&
-                item.studentId === progress.studentId &&
-                item.subject === progress.subject &&
-                item.chapterNo === progress.chapterNo &&
-                item.title ===
-                  `Start reading & note making for ${progress.chapterName}`
-              )
-          )
-        );
-      }
+      //       try {
+      //         const workItemRef = doc(db, "workItems", newWorkItem.id);
+      //         await setDoc(workItemRef, newWorkItem);
+      //         console.log("Work item saved to Firestore:", newWorkItem.id);
+      //       } catch (error) {
+      //         console.error("Failed to save work item to Firestore:", error);
+      //       }
+      //     }
+      //   }
 
+      // Logic for removing a work item
+      //   const removedEntries = oldEntries.filter((e) => !newEntryIds.has(e.id));
+      //   const removedStartEntry = removedEntries.find((e) => e.type === "start");
+
+      //   if (removedStartEntry) {
+      //     const workItemToRemove = workItems.find(
+      //       (item) =>
+      //         item.source === "syllabus" &&
+      //         item.studentId === progress.studentId &&
+      //         item.subject === progress.subject &&
+      //         item.chapterNo === progress.chapterNo &&
+      //         item.title ===
+      //           `Start reading & note making for ${progress.chapterName}`
+      //     );
+
+      //     if (workItemToRemove) {
+      //       setWorkItems((prev) =>
+      //         prev.filter((item) => item.id !== workItemToRemove.id)
+      //       );
+
+      //       try {
+      //         const workItemRef = doc(db, "workItems", workItemToRemove.id);
+      //         await deleteDoc(workItemRef);
+      //         console.log(
+      //           "Work item deleted from Firestore:",
+      //           workItemToRemove.id
+      //         );
+      //       } catch (error) {
+      //         console.error("Failed to delete work item from Firestore:", error);
+      //       }
+      //     }
+      //   }
+
+      // Update chapter progress state
       setChapterProgress((prev) => {
         const index = prev.findIndex((p) => p.id === progress.id);
         if (index > -1) {
@@ -316,11 +342,26 @@ const App: React.FC = () => {
         }
         return prev;
       });
+
+      // Save chapter progress to Firestore
+      try {
+        if (progress.entries.length === 0) {
+          const progressRef = doc(db, "chapterProgress", progress.id);
+          await deleteDoc(progressRef);
+          console.log("Chapter progress deleted from Firestore:", progress.id);
+        } else {
+          const progressRef = doc(db, "chapterProgress", progress.id);
+          await setDoc(progressRef, progress);
+          console.log("Chapter progress saved to Firestore:", progress.id);
+        }
+      } catch (error) {
+        console.error("Failed to save chapter progress to Firestore:", error);
+      }
     },
     [chapterProgress, workItems]
   );
 
-  const handleSaveWorkItem = useCallback((workItem: WorkItem) => {
+  const handleSaveWorkItem = useCallback(async (workItem: WorkItem) => {
     setWorkItems((prev) => {
       const existingIndex = prev.findIndex((item) => item.id === workItem.id);
       if (existingIndex > -1) {
@@ -330,13 +371,29 @@ const App: React.FC = () => {
       }
       return [...prev, workItem];
     });
+
+    try {
+      const workItemRef = doc(db, "workItems", workItem.id);
+      await setDoc(workItemRef, workItem);
+      console.log("Work item saved to Firestore:", workItem.id);
+    } catch (error) {
+      console.error("Failed to save work item to Firestore:", error);
+    }
   }, []);
 
-  const handleDeleteWorkItem = useCallback((workItemId: string) => {
+  const handleDeleteWorkItem = useCallback(async (workItemId: string) => {
     setWorkItems((prev) => prev.filter((item) => item.id !== workItemId));
+
+    try {
+      const workItemRef = doc(db, "workItems", workItemId);
+      await deleteDoc(workItemRef);
+      console.log("Work item deleted from Firestore:", workItemId);
+    } catch (error) {
+      console.error("Failed to delete work item from Firestore:", error);
+    }
   }, []);
 
-  const handleSaveDoubt = useCallback((doubt: Doubt) => {
+  const handleSaveDoubt = useCallback(async (doubt: Doubt) => {
     setDoubts((prev) => {
       const existingIndex = prev.findIndex((d) => d.id === doubt.id);
       if (existingIndex > -1) {
@@ -346,38 +403,97 @@ const App: React.FC = () => {
       }
       return [...prev, doubt];
     });
+
+    try {
+      const doubtRef = doc(db, "doubts", doubt.id);
+      await setDoc(doubtRef, doubt);
+      console.log("Doubt saved to Firestore:", doubt.id);
+    } catch (error) {
+      console.error("Failed to save doubt to Firestore:", error);
+    }
   }, []);
 
   const handleDeleteDoubt = useCallback(
-    (doubtId: string) => {
+    async (doubtId: string) => {
       // Find if the doubt being deleted has a linked work task
       const linkedWorkItem = workItems.find(
         (item) => item.linkedDoubtId === doubtId && item.source === "doubt"
       );
 
-      // If a task is found, delete it as well.
+      // If a task is found, delete it as well
       if (linkedWorkItem) {
         setWorkItems((prev) =>
           prev.filter((item) => item.id !== linkedWorkItem.id)
         );
+
+        try {
+          const workItemRef = doc(db, "workItems", linkedWorkItem.id);
+          await deleteDoc(workItemRef);
+          console.log(
+            "Linked work item deleted from Firestore:",
+            linkedWorkItem.id
+          );
+        } catch (error) {
+          console.error(
+            "Failed to delete linked work item from Firestore:",
+            error
+          );
+        }
       }
 
-      // Then, delete the doubt itself.
+      // Delete the doubt itself
       setDoubts((prev) => prev.filter((d) => d.id !== doubtId));
+
+      try {
+        const doubtRef = doc(db, "doubts", doubtId);
+        await deleteDoc(doubtRef);
+        console.log("Doubt deleted from Firestore:", doubtId);
+      } catch (error) {
+        console.error("Failed to delete doubt from Firestore:", error);
+      }
     },
     [workItems]
   );
 
-  const handleArchive = useCallback((id: string) => {
-    setStudents((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isArchived: !s.isArchived } : s))
-    );
-    setViewingStudent(null);
-  }, []);
+  const handleArchive = useCallback(
+    async (id: string) => {
+      const student = students.find((s) => s.id === id);
+      if (student) {
+        const updatedStudent = { ...student, isArchived: !student.isArchived };
 
-  const handleDelete = useCallback((id: string) => {
+        setStudents((prev) =>
+          prev.map((s) => (s.id === id ? updatedStudent : s))
+        );
+        setViewingStudent(null);
+
+        try {
+          const studentRef = doc(db, "students", id);
+          await updateDoc(studentRef, {
+            isArchived: updatedStudent.isArchived,
+          });
+          console.log("Student archive status updated in Firestore:", id);
+        } catch (error) {
+          console.error(
+            "Failed to update student archive status in Firestore:",
+            error
+          );
+        }
+      }
+    },
+    [students]
+  );
+
+  const handleDelete = useCallback(async (id: string) => {
     setStudents((prev) => prev.filter((s) => s.id !== id));
     setViewingStudent(null);
+
+    try {
+      const studentRef = doc(db, "students", id);
+      await deleteDoc(studentRef);
+      console.log("Student deleted from Firestore:", id);
+    } catch (error) {
+      console.error("Failed to delete student from Firestore:", error);
+    }
   }, []);
 
   const handleFilterChange = useCallback(
@@ -404,6 +520,7 @@ const App: React.FC = () => {
     setViewingStudent(student);
   };
 
+  // Computed values
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
       if (student.isArchived !== showArchived) return false;
@@ -420,6 +537,7 @@ const App: React.FC = () => {
     });
   }, [students, showArchived, filters, searchQuery]);
 
+  // Render functions
   const renderPageContent = () => {
     switch (currentPage) {
       case "subjects":
