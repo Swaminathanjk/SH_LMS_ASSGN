@@ -9,6 +9,8 @@ interface StudentCardProps {
     onClick: (student: Student) => void;
 }
 
+// console.log(Student)
+
 const StudentCard: React.FC<StudentCardProps> = ({ student, onClick }) => {
     const contact = student.personalPhone || student.fatherPhone || student.motherPhone;
     const boardStyle = SUBJECT_CARD_STYLES[student.board] || SUBJECT_CARD_STYLES['GSEB'];
@@ -18,6 +20,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onClick }) => {
             className={`bg-light-card dark:bg-dark-card rounded-2xl shadow-md transition-all duration-300 cursor-pointer hover:shadow-lg flex flex-col border-l-4 ${boardStyle.border}`}
             onClick={() => onClick(student)}
         >
+            
             <div className="p-4 flex flex-col h-full">
                 <div className="flex items-start space-x-4">
                     <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
