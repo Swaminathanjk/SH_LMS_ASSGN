@@ -241,90 +241,90 @@ const App: React.FC = () => {
       const newEntries = progress.entries;
       const newEntryIds = new Set(newEntries.map((e) => e.id));
 
-      //   // Logic for adding a work item
-      //   const addedEntries = newEntries.filter((e) => !oldEntryIds.has(e.id));
-      //   const newStartEntry = addedEntries.find((e) => e.type === "start");
+        // Logic for adding a work item
+        const addedEntries = newEntries.filter((e) => !oldEntryIds.has(e.id));
+        const newStartEntry = addedEntries.find((e) => e.type === "start");
 
-      //   if (newStartEntry) {
-      //     const workAlreadyExists = workItems.some(
-      //       (item) =>
-      //         item.source === "syllabus" &&
-      //         item.studentId === progress.studentId &&
-      //         item.subject === progress.subject &&
-      //         item.chapterNo === progress.chapterNo &&
-      //         item.title ===
-      //           `Start reading & note making for ${progress.chapterName}`
-      //     );
+        if (newStartEntry) {
+          const workAlreadyExists = workItems.some(
+            (item) =>
+              item.source === "syllabus" &&
+              item.studentId === progress.studentId &&
+              item.subject === progress.subject &&
+              item.chapterNo === progress.chapterNo &&
+              item.title ===
+                `Start reading & note making for ${progress.chapterName}`
+          );
 
-      //     if (!workAlreadyExists) {
-      //       const dueDate = new Date(newStartEntry.date);
-      //       dueDate.setDate(dueDate.getDate() + 7);
+          if (!workAlreadyExists) {
+            const dueDate = new Date(newStartEntry.date);
+            dueDate.setDate(dueDate.getDate() + 7);
 
-      //       const newWorkItem: WorkItem = {
-      //         id: `w_${Date.now()}`,
-      //         studentId: progress.studentId,
-      //         title: `Start reading & note making for ${progress.chapterName}`,
-      //         subject: progress.subject,
-      //         chapterNo: progress.chapterNo,
-      //         chapterName: progress.chapterName,
-      //         topic: null,
-      //         description:
-      //           "Begin reading and making notes as the chapter has started in school.",
-      //         dueDate: dueDate.toISOString().split("T")[0],
-      //         status: "Assign",
-      //         priority: "Low",
-      //         links: null,
-      //         files: null,
-      //         mentorNote: null,
-      //         dateCreated: new Date().toISOString().split("T")[0],
-      //         source: "syllabus",
-      //         linkedDoubtId: null,
-      //       };
+            const newWorkItem: WorkItem = {
+              id: `w_${Date.now()}`,
+              studentId: progress.studentId,
+              title: `Start reading & note making for ${progress.chapterName}`,
+              subject: progress.subject,
+              chapterNo: progress.chapterNo,
+              chapterName: progress.chapterName,
+              topic: null,
+              description:
+                "Begin reading and making notes as the chapter has started in school.",
+              dueDate: dueDate.toISOString().split("T")[0],
+              status: "Assign",
+              priority: "Low",
+              links: null,
+              files: null,
+              mentorNote: null,
+              dateCreated: new Date().toISOString().split("T")[0],
+              source: "syllabus",
+              linkedDoubtId: null,
+            };
 
-      //       setWorkItems((prev) => [...prev, newWorkItem]);
+            setWorkItems((prev) => [...prev, newWorkItem]);
 
-      //       try {
-      //         const workItemRef = doc(db, "workItems", newWorkItem.id);
-      //         await setDoc(workItemRef, newWorkItem);
-      //         console.log("Work item saved to Firestore:", newWorkItem.id);
-      //       } catch (error) {
-      //         console.error("Failed to save work item to Firestore:", error);
-      //       }
-      //     }
-      //   }
+            try {
+              const workItemRef = doc(db, "workItems", newWorkItem.id);
+              await setDoc(workItemRef, newWorkItem);
+              console.log("Work item saved to Firestore:", newWorkItem.id);
+            } catch (error) {
+              console.error("Failed to save work item to Firestore:", error);
+            }
+          }
+        }
 
       // Logic for removing a work item
-      //   const removedEntries = oldEntries.filter((e) => !newEntryIds.has(e.id));
-      //   const removedStartEntry = removedEntries.find((e) => e.type === "start");
+        const removedEntries = oldEntries.filter((e) => !newEntryIds.has(e.id));
+        const removedStartEntry = removedEntries.find((e) => e.type === "start");
 
-      //   if (removedStartEntry) {
-      //     const workItemToRemove = workItems.find(
-      //       (item) =>
-      //         item.source === "syllabus" &&
-      //         item.studentId === progress.studentId &&
-      //         item.subject === progress.subject &&
-      //         item.chapterNo === progress.chapterNo &&
-      //         item.title ===
-      //           `Start reading & note making for ${progress.chapterName}`
-      //     );
+        if (removedStartEntry) {
+          const workItemToRemove = workItems.find(
+            (item) =>
+              item.source === "syllabus" &&
+              item.studentId === progress.studentId &&
+              item.subject === progress.subject &&
+              item.chapterNo === progress.chapterNo &&
+              item.title ===
+                `Start reading & note making for ${progress.chapterName}`
+          );
 
-      //     if (workItemToRemove) {
-      //       setWorkItems((prev) =>
-      //         prev.filter((item) => item.id !== workItemToRemove.id)
-      //       );
+          if (workItemToRemove) {
+            setWorkItems((prev) =>
+              prev.filter((item) => item.id !== workItemToRemove.id)
+            );
 
-      //       try {
-      //         const workItemRef = doc(db, "workItems", workItemToRemove.id);
-      //         await deleteDoc(workItemRef);
-      //         console.log(
-      //           "Work item deleted from Firestore:",
-      //           workItemToRemove.id
-      //         );
-      //       } catch (error) {
-      //         console.error("Failed to delete work item from Firestore:", error);
-      //       }
-      //     }
-      //   }
+            try {
+              const workItemRef = doc(db, "workItems", workItemToRemove.id);
+              await deleteDoc(workItemRef);
+              console.log(
+                "Work item deleted from Firestore:",
+                workItemToRemove.id
+              );
+            } catch (error) {
+              console.error("Failed to delete work item from Firestore:", error);
+            }
+          }
+        }
 
       // Update chapter progress state
       setChapterProgress((prev) => {
