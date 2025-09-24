@@ -210,7 +210,7 @@ const App: React.FC = () => {
       await setDoc(studentRef, studentData);
       console.log("Student saved to Firestore:", studentData.id);
     } catch (error) {
-      console.error("Failed to save student to Firestore:", error);
+      console.error("Failed to save student to Firestore:", error); 
     }
   }, []);
 
