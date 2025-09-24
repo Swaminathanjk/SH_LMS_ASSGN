@@ -258,7 +258,7 @@ const App: React.FC = () => {
 
           if (!workAlreadyExists) {
             const dueDate = new Date(newStartEntry.date);
-            dueDate.setDate(dueDate.getDate() + 7);
+            dueDate.setDate(dueDate.getDate() + 1);
 
             const newWorkItem: WorkItem = {
               id: `w_${Date.now()}`,
