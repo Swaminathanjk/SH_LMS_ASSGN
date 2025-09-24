@@ -271,7 +271,7 @@ const App: React.FC = () => {
               description:
                 "Begin reading and making notes as the chapter has started in school.",
               dueDate: dueDate.toISOString().split("T")[0],
-              status: "Assign",
+              status: "Pending",
               priority: "Low",
               links: null,
               files: null,
